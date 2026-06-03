@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoltifyAI | Solar Fault Detection</title>
+    <meta name="description" content="Real-time solar telemetry and AI-driven fault detection dashboard.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #fafafa;
+            font-family: 'Manrope', sans-serif;
+            color: #1a1a1a;
+            letter-spacing: -0.01em;
+        }
+        h1, h2, h3 {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            letter-spacing: -0.02em;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 24px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.04);
+            background: rgba(255, 255, 255, 0.9);
+        }
+        .status-banner {
+            transition: all 0.6s ease;
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        .metric-value {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+    <!-- Header -->
+    <header class="max-w-7xl mx-auto px-6 pt-8 pb-4 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-extrabold text-blue-600">VoltifyAI</h1>
+            <p class="text-sm text-gray-500 font-medium uppercase tracking-widest">Intelligent PV Diagnosis</p>
+        </div>
+        <div id="connection-status" class="flex items-center gap-2 text-sm font-semibold opacity-60">
+            <span class="w-2 h-2 rounded-full bg-green-500"></span>
+            LIVE TELEMETRY
+        </div>
+    </header>
+
+    <!-- Dynamic Status Banner -->
+    <div class="max-w-7xl mx-auto px-6 mb-8">
+        <div id="status-banner" class="status-banner w-full py-6 px-8 rounded-3xl flex items-center justify-between bg-emerald-50 text-emerald-900 border border-emerald-100">
+            <div class="flex items-center gap-4">
+                <div id="status-icon" class="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-widest opacity-60">System Diagnosis</p>
+                    <h2 id="status-label" class="text-xl font-bold">Normal Operation</h2>
+                </div>
+            </div>
+            <div id="status-subtext" class="text-right hidden md:block">
+                <p class="text-sm font-medium">All hardware strings performing within optimal parameters.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics Grid -->
+    <main class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Vdc -->
+        <div class="glass-card p-8">
+            <p class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Voltage</p>
+            <div class="flex items-baseline gap-1">
+                <span id="vdc-value" class="text-4xl font-extrabold metric-value">0.00</span>
+                <span class="text-lg font-bold text-gray-400">V</span>
+            </div>
+        </div>
+        <!-- Idc -->
+        <div class="glass-card p-8">
+            <p class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Current</p>
+            <div class="flex items-baseline gap-1">
+                <span id="idc-value" class="text-4xl font-extrabold metric-value">0.00</span>
+                <span class="text-lg font-bold text-gray-400">A</span>
+            </div>
+        </div>
+        <!-- Irradiance -->
+        <div class="glass-card p-8">
+            <p class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Irradiance</p>
+            <div class="flex items-baseline gap-1">
+                <span id="irr-value" class="text-4xl font-extrabold metric-value">0</span>
+                <span class="text-lg font-bold text-gray-400">W/m²</span>
+            </div>
+        </div>
+        <!-- Temperature -->
+        <div class="glass-card p-8">
+            <p class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Temperature</p>
+            <div class="flex items-baseline gap-1">
+                <span id="pvt-value" class="text-4xl font-extrabold metric-value">0.0</span>
+                <span class="text-lg font-bold text-gray-400">°C</span>
+            </div>
+        </div>
+    </main>
+
+    <!-- Chart Container -->
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="glass-card p-8 h-[450px]">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-bold">Real-time Performance Timeline</h3>
+                <div class="flex gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                        <span class="text-xs font-bold text-gray-500">Vdc</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-indigo-300"></span>
+                        <span class="text-xs font-bold text-gray-500">Idc</span>
+                    </div>
+                </div>
+            </div>
+            <div class="relative h-[320px]">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simulation Controls / Fault Injection -->
+    <div class="max-w-7xl mx-auto px-6 mt-8">
+        <div class="glass-card p-8">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">Incident Injection & Simulation Controls</h3>
+                    <p class="text-sm text-gray-500">Inject real telemetry states from the dataset. VoltifyAI's XGBoost model will analyze the stream in real-time.</p>
+                </div>
+                <div id="simulation-indicator" class="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-widest">
+                    Live Stream Mode
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <button onclick="injectFault(0)" class="py-3 px-4 rounded-xl font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-all duration-200 border border-emerald-200 hover:-translate-y-0.5 shadow-sm active:translate-y-0">
+                    Normal Operation
+                </button>
+                <button onclick="injectFault(1)" class="py-3 px-4 rounded-xl font-bold bg-red-50 hover:bg-red-100 text-red-800 transition-all duration-200 border border-red-200 hover:-translate-y-0.5 shadow-sm active:translate-y-0">
+                    Short-Circuit
+                </button>
+                <button onclick="injectFault(2)" class="py-3 px-4 rounded-xl font-bold bg-rose-50 hover:bg-rose-100 text-rose-800 transition-all duration-200 border border-rose-200 hover:-translate-y-0.5 shadow-sm active:translate-y-0">
+                    Degradation
+                </button>
+                <button onclick="injectFault(3)" class="py-3 px-4 rounded-xl font-bold bg-orange-50 hover:bg-orange-100 text-orange-800 transition-all duration-200 border border-orange-200 hover:-translate-y-0.5 shadow-sm active:translate-y-0">
+                    Open Circuit
+                </button>
+                <button onclick="injectFault(4)" class="py-3 px-4 rounded-xl font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 transition-all duration-200 border border-amber-200 hover:-translate-y-0.5 shadow-sm active:translate-y-0">
+                    Shadowing (Occlusion)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api/telemetry';
+        let chart;
+        const maxTicks = 15;
+        const labels = Array(maxTicks).fill('');
+        const vdcData = Array(maxTicks).fill(0);
+        const idcData = Array(maxTicks).fill(0);
+
+        function initChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Voltage (V)',
+                            data: vdcData,
+                            borderColor: '#3b82f6',
+                            borderWidth: 4,
+                            pointRadius: 0,
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Current (A)',
+                            data: idcData,
+                            borderColor: '#a5b4fc',
+                            borderWidth: 4,
+                            pointRadius: 0,
+                            tension: 0.4,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f0f0f0' },
+                            ticks: { font: { family: 'Manrope', weight: 'bold' } }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function fetchTelemetry() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                updateUI(data);
+            } catch (error) {
+                console.error('Error fetching telemetry:', error);
+                document.getElementById('connection-status').innerHTML = `
+                    <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                    DISCONNECTED
+                `;
+            }
+        }
+
+        function updateUI(data) {
+            // Update Metrics
+            document.getElementById('vdc-value').innerText = data.vdc.toFixed(2);
+            document.getElementById('idc-value').innerText = data.idc.toFixed(2);
+            document.getElementById('irr-value').innerText = data.irr.toFixed(0);
+            document.getElementById('pvt-value').innerText = data.pvt.toFixed(1);
+
+            // Update Status Banner
+            const banner = document.getElementById('status-banner');
+            const label = document.getElementById('status-label');
+            const subtext = document.getElementById('status-subtext');
+            const icon = document.getElementById('status-icon');
+
+            banner.classList.remove('bg-emerald-50', 'bg-amber-50', 'bg-rose-50', 'border-emerald-100', 'border-amber-100', 'border-rose-100', 'pulse-animation');
+            label.innerText = data.status_label;
+
+            if (data.status_code === 0) { // Normal
+                banner.classList.add('bg-emerald-50', 'border-emerald-100', 'text-emerald-900');
+                subtext.innerText = "All hardware strings performing within optimal parameters.";
+                icon.innerHTML = '<svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+            } else if (data.status_code === 4) { // Shadowing
+                banner.classList.add('bg-amber-50', 'border-amber-100', 'text-amber-900');
+                subtext.innerText = "Environmental occlusion detected. Performance slightly reduced.";
+                icon.innerHTML = '<svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9h-1m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707"></path></svg>';
+            } else { // Faults (Short-Circuit, Degradation, Open Circuit)
+                banner.classList.add('bg-rose-50', 'border-rose-100', 'text-rose-900', 'pulse-animation');
+                if (data.status_code === 1) {
+                    subtext.innerText = "CRITICAL: Short-circuit detected on legacy String 1. Electrical hazard risk.";
+                } else if (data.status_code === 2) {
+                    subtext.innerText = "WARNING: Solar cell degradation detected. System efficiency is compromised.";
+                } else if (data.status_code === 3) {
+                    subtext.innerText = "CRITICAL: Open circuit detected on String 1. No current flowing. Check wiring.";
+                } else {
+                    subtext.innerText = "CRITICAL: Hardware structural anomaly detected. Maintenance required.";
+                }
+                icon.innerHTML = '<svg class="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>';
+            }
+
+            // Update Chart
+            vdcData.push(data.vdc);
+            idcData.push(data.idc);
+            if (vdcData.length > maxTicks) {
+                vdcData.shift();
+                idcData.shift();
+            }
+            chart.update('none');
+        }
+
+        async function injectFault(faultId) {
+            const indicator = document.getElementById('simulation-indicator');
+            try {
+                indicator.innerText = "Injecting State...";
+                indicator.className = "px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-widest pulse-animation";
+                
+                const response = await fetch(`http://localhost:5000/api/simulate/${faultId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    vdcData.fill(data.telemetry.vdc);
+                    idcData.fill(data.telemetry.idc);
+                    updateUI(data.telemetry);
+                    
+                    const stateLabels = ["Normal Operation", "Short-Circuit", "Degradation", "Open Circuit", "Shadowing"];
+                    indicator.innerText = `Simulating: ${stateLabels[faultId]}`;
+                    indicator.className = "px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-widest";
+                    
+                    setTimeout(() => {
+                        if (indicator.innerText.startsWith("Simulating:")) {
+                            indicator.innerText = "Live Stream Mode";
+                            indicator.className = "px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-widest";
+                        }
+                    }, 6000);
+                } else {
+                    console.error('Failed to inject fault:', data.error);
+                }
+            } catch (error) {
+                console.error('Error injecting fault:', error);
+                indicator.innerText = "Injection Error";
+                indicator.className = "px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-100 uppercase tracking-widest";
+            }
+        }
+
+        window.onload = () => {
+            initChart();
+            fetchTelemetry();
+            setInterval(fetchTelemetry, 3000);
+        };
+    </script>
+</body>
+</html>
