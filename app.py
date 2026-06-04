@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from scipy.io import loadmat
 import xgboost as xgb
@@ -8,13 +8,17 @@ import joblib
 import threading
 import time
 import os
+import database
+
+# Initialize database
+database.init_db()
 
 app = Flask(__name__)
 CORS(app)
 
 # 1. Load Pre-trained Model and Configuration
 print("Loading pre-trained XGBoost model for VoltifyAI...")
-MODEL_PATH = 'XGBoost.pkl'
+MODEL_PATH = 'models/XGBoost.pkl'
 if os.path.exists(MODEL_PATH):
     model_data = joblib.load(MODEL_PATH)
     xgb_model = model_data['model']
@@ -38,8 +42,8 @@ CLIP_LIMITS = {
 
 # 2. Load Datasets
 print("Loading datasets...")
-elec_data = loadmat('dataset_elec.mat')
-amb_data = loadmat('dataset_amb.mat')
+elec_data = loadmat('data/dataset_elec.mat')
+amb_data = loadmat('data/dataset_amb.mat')
 
 # Feature extraction for String 1 and Ambient
 vdc = elec_data['vdc1'].flatten()
@@ -116,6 +120,7 @@ def get_telemetry():
     if irr_val < 10:
         prediction = 0
         label_name = FAULT_LABELS.get(prediction, 'Normal')
+        confidence = 1.0
     else:
         # Clip incoming features to training quantiles to handle outliers
         clipped_features = {}
@@ -130,6 +135,10 @@ def get_telemetry():
         # Predict
         prediction = int(xgb_model.predict(X_raw)[0])
         label_name = FAULT_LABELS.get(prediction, 'Unknown')
+        
+        # Calculate prediction confidence
+        probabilities = xgb_model.predict_proba(X_raw)[0]
+        confidence = float(probabilities[prediction])
     
     return jsonify({
         'vdc': vdc1,
@@ -138,7 +147,8 @@ def get_telemetry():
         'pvt': pvt_val,
         'pdc': pdc1,
         'status_code': prediction,
-        'status_label': label_name
+        'status_label': label_name,
+        'confidence': confidence
     })
 
 @app.route('/api/simulate/<int:fault_id>', methods=['POST'])
@@ -174,6 +184,7 @@ def simulate_fault(fault_id):
         if irr_val < 10:
             prediction = 0
             label_name = FAULT_LABELS.get(prediction, 'Normal')
+            confidence = 1.0
         else:
             clipped_features = {}
             for col in FEATURE_COLS:
@@ -184,6 +195,10 @@ def simulate_fault(fault_id):
             prediction = int(xgb_model.predict(X_raw)[0])
             label_name = FAULT_LABELS.get(prediction, 'Unknown')
             
+            # Calculate prediction confidence
+            probabilities = xgb_model.predict_proba(X_raw)[0]
+            confidence = float(probabilities[prediction])
+            
         return jsonify({
             'success': True,
             'telemetry': {
@@ -193,11 +208,47 @@ def simulate_fault(fault_id):
                 'pvt': pvt_val,
                 'pdc': pdc1,
                 'status_code': prediction,
-                'status_label': label_name
+                'status_label': label_name,
+                'confidence': confidence
             }
         })
     else:
         return jsonify({'success': False, 'error': 'Invalid fault ID'}), 400
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({'success': False, 'error': 'Missing username or password'}), 400
+    
+    user = database.verify_user(data['username'], data['password'])
+    if user:
+        token = f"session-token-{user['username']}"
+        return jsonify({
+            'success': True,
+            'token': token,
+            'user': {
+                'username': user['username'],
+                'role': user['role']
+            }
+        })
+    return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
+
+@app.route('/api/session', methods=['GET'])
+def get_session():
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        if token.startswith('session-token-'):
+            username = token.replace('session-token-', '')
+            return jsonify({
+                'success': True,
+                'user': {
+                    'username': username,
+                    'role': 'admin' if username == 'admin' else 'operator'
+                }
+            })
+    return jsonify({'success': False, 'error': 'Unauthorized'}), 401
 
 @app.route('/')
 def home():

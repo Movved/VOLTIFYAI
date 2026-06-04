@@ -6,3 +6,4 @@ scipy
 xgboost
 joblib
 scikit-learn
+pymysql

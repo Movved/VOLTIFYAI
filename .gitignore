@@ -1,0 +1,28 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache & Compiled Files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Local SQLite Database States
+data/voltifyai.db
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+# OS-Specific Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE Settings & Temporary Logs
+.idea/
+.vscode/
+*.log

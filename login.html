@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoltifyAI | Diagnostic Access Gate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #030712;
+            background-image: radial-gradient(circle at 50% 50%, #0f172a 0%, #030712 100%);
+            font-family: 'Manrope', sans-serif;
+            color: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        h2 {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            letter-spacing: -0.02em;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+        .glow-effect {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0) 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .cta-glow:hover {
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.3);
+        }
+    </style>
+</head>
+<body class="relative px-6">
+    <div class="glow-effect -top-12 -left-12"></div>
+    <div class="glow-effect -bottom-12 -right-12"></div>
+
+    <div class="w-full max-w-md relative z-10">
+        <!-- Logo Header -->
+        <div class="flex flex-col items-center mb-8">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20 mb-3">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <h1 class="text-2xl font-extrabold bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">VoltifyAI</h1>
+            <p class="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Diagnostic Access Control</p>
+        </div>
+
+        <!-- Login Glass Card -->
+        <div class="glass-card rounded-3xl p-8 md:p-10">
+            <h2 class="text-xl font-bold text-slate-100 mb-2">Authentication Gateway</h2>
+            <p class="text-xs text-slate-400 mb-6">Access requires operator authorization. Enter credentials below.</p>
+
+            <!-- Custom Error Alert Container -->
+            <div id="error-alert" class="hidden mb-5 py-3 px-4 rounded-xl bg-red-950/30 border border-red-500/20 text-xs text-red-400 font-semibold flex items-center gap-2">
+                <svg class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                <span id="error-message">Invalid credentials</span>
+            </div>
+
+            <!-- Login Form -->
+            <form onsubmit="handleLogin(event)" class="space-y-5">
+                <div>
+                    <label for="username" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Username</label>
+                    <input type="text" id="username" required
+                        class="w-full px-4 py-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200"
+                        placeholder="operator">
+                </div>
+
+                <div>
+                    <label for="password" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Password</label>
+                    <input type="password" id="password" required
+                        class="w-full px-4 py-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200"
+                        placeholder="••••••••">
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" id="submit-btn"
+                        class="cta-glow w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all duration-200 cursor-pointer shadow-lg shadow-blue-500/10 text-sm tracking-wide">
+                        Sign In
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <p class="text-center text-[10px] text-slate-600 font-bold uppercase tracking-widest mt-8">
+            Flask REST API • SQLite / MySQL persistent auth
+        </p>
+    </div>
+
+    <script>
+        // Redirect to dashboard if session token already exists and is active
+        window.onload = () => {
+            if (localStorage.getItem('voltify_token')) {
+                window.location.href = 'dashboard.html';
+            }
+        };
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const usernameInput = document.getElementById('username').value.trim();
+            const passwordInput = document.getElementById('password').value.trim();
+            const errorAlert = document.getElementById('error-alert');
+            const errorMessage = document.getElementById('error-message');
+            const submitBtn = document.getElementById('submit-btn');
+
+            errorAlert.classList.add('hidden');
+            submitBtn.innerText = "Authorizing...";
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('http://localhost:5000/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: usernameInput,
+                        password: passwordInput
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    // Store session data
+                    localStorage.setItem('voltify_token', data.token);
+                    localStorage.setItem('voltify_user', data.user.username);
+                    localStorage.setItem('voltify_role', data.user.role);
+
+                    // Redirect to dashboard
+                    window.location.href = 'dashboard.html';
+                } else {
+                    errorMessage.innerText = data.error || 'Invalid credentials';
+                    errorAlert.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('Login request failed:', err);
+                errorMessage.innerText = 'Network error: cannot reach authentication server.';
+                errorAlert.classList.remove('hidden');
+            } finally {
+                submitBtn.innerText = "Sign In";
+                submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
